@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>YouTube Video Feed</title>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Chronological YouTube Feed</title>
   <style>
     body {
       font-family: sans-serif;
@@ -14,60 +14,78 @@
     h1 {
       text-align: center;
     }
+    #error {
+      color: red;
+      text-align: center;
+      margin-top: 1rem;
+    }
     #grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(240px,1fr));
       gap: 1rem;
       margin-top: 2rem;
     }
     .video {
-      background: white;
+      background: #fff;
       border-radius: 8px;
       overflow: hidden;
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
       transition: transform 0.2s;
     }
-    .video:hover {
-      transform: scale(1.03);
-    }
+    .video:hover { transform: scale(1.03) }
     .video img {
       width: 100%;
-      height: auto;
       display: block;
     }
-    .video .info {
+    .info {
       padding: 0.5rem;
     }
-    .video .info h3 {
+    .info h3 {
       font-size: 1rem;
       margin: 0;
     }
-    .video .info p {
+    .info p {
       font-size: 0.8rem;
       color: #555;
+      margin: 0.25rem 0 0;
     }
   </style>
 </head>
 <body>
   <h1>Chronological YouTube Feed</h1>
-  <div id="grid"></div>
+  <div id="grid">Loading videos…</div>
+  <div id="error"></div>
 
   <script>
-    const apiKey = 'AIzaSyAoh7__mqdxlqOXWz_WC4_fDYGR5ftvYfU'; // Your YouTube Data API key
+    const apiKey = 'AIzaSyAoh7__mqdxlqOXWz_WC4_fDYGR5ftvYfU';
     const channelIds = [
       'UCyKxD2gVBMC2HvQv3rc6M5g', // TWD98
       'UCBLr7ISa_YDy5dde3RyQ6HA'  // Tottenham Hotspur
     ];
 
     async function getUploadsPlaylistId(channelId) {
-      const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=contentDetails&id=${channelId}&key=${apiKey}`);
+      console.log('Fetching uploads playlist for', channelId);
+      const res = await fetch(
+        `https://www.googleapis.com/youtube/v3/channels?` +
+        `part=contentDetails&id=${channelId}&key=${apiKey}`
+      );
       const data = await res.json();
+      if (!data.items || !data.items[0]) {
+        throw new Error(`No channel data for ${channelId}`);
+      }
       return data.items[0].contentDetails.relatedPlaylists.uploads;
     }
 
     async function getVideosFromPlaylist(playlistId) {
-      const res = await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=10&playlistId=${playlistId}&key=${apiKey}`);
+      console.log('Fetching videos from playlist', playlistId);
+      const res = await fetch(
+        `https://www.googleapis.com/youtube/v3/playlistItems?` +
+        `part=snippet&maxResults=10&playlistId=${playlistId}&key=${apiKey}`
+      );
       const data = await res.json();
+      if (!data.items) {
+        throw new Error(`No videos found in playlist ${playlistId}`);
+      }
       return data.items.map(item => ({
         title: item.snippet.title,
         thumbnail: item.snippet.thumbnails.medium.url,
@@ -77,33 +95,44 @@
       }));
     }
 
-    async function loadVideos() {
-      let allVideos = [];
-      for (const id of channelIds) {
-        const playlistId = await getUploadsPlaylistId(id);
-        const videos = await getVideosFromPlaylist(playlistId);
-        allVideos = allVideos.concat(videos);
-      }
-      allVideos.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
-      displayVideos(allVideos);
-    }
-
     function displayVideos(videos) {
       const grid = document.getElementById('grid');
       grid.innerHTML = '';
-      for (const vid of videos) {
-        const el = document.createElement('div');
-        el.className = 'video';
-        el.innerHTML = `
+      videos.forEach(vid => {
+        const div = document.createElement('div');
+        div.className = 'video';
+        div.innerHTML = `
           <a href="https://www.youtube.com/watch?v=${vid.videoId}" target="_blank">
-            <img src="${vid.thumbnail}" alt="${vid.title}" />
+            <img src="${vid.thumbnail}" alt="${vid.title}"/>
             <div class="info">
               <h3>${vid.title}</h3>
               <p>${new Date(vid.publishedAt).toLocaleString()}<br>${vid.channelTitle}</p>
             </div>
           </a>
         `;
-        grid.appendChild(el);
+        grid.appendChild(div);
+      });
+    }
+
+    async function loadVideos() {
+      try {
+        let all = [];
+        for (const ch of channelIds) {
+          const pid = await getUploadsPlaylistId(ch);
+          const vids = await getVideosFromPlaylist(pid);
+          all = all.concat(vids);
+        }
+        all.sort((a,b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+        if (all.length === 0) {
+          document.getElementById('grid').textContent = 'No videos to display.';
+        } else {
+          displayVideos(all);
+        }
+      } catch (e) {
+        console.error(e);
+        document.getElementById('grid').textContent = '';
+        document.getElementById('error').textContent =
+          '⚠️ Error loading videos. Check console for details.';
       }
     }
 
@@ -111,4 +140,3 @@
   </script>
 </body>
 </html>
-
