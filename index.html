@@ -22,62 +22,69 @@
   <div id="error"></div>
   <script>
     const apiKey = 'AIzaSyAoh7__mqdxlqOXWz_WC4_fDYGR5ftvYfU';
-    const channelIds = ['UCyKxD2gVBMC2HvQv3rc6M5g', 'UCBLr7ISa_YDy5dde3RyQ6HA'];
+    const channelIds = [
+      'UCyKxD2gVBMC2HvQv3rc6M5g', // TWD98
+      'UCBLr7ISa_YDy5dde3RyQ6HA'  // Tottenham Hotspur
+    ];
 
+    // Fetch channel info for avatars
     async function fetchChannelInfo(id) {
       try {
         const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet&id=${id}&key=${apiKey}`);
         const data = await res.json();
-        if (!data.items || !data.items[0]) throw new Error('No channel info');
-        const snip = data.items[0].snippet;
-        return { title: snip.title, avatar: snip.thumbnails.default.url };
+        const snip = data.items?.[0]?.snippet;
+        return { avatar: snip?.thumbnails?.default?.url || '' };
       } catch (e) {
-        console.error('fetchChannelInfo', id, e);
-        return { title: '', avatar: '' };
+        console.error('fetchChannelInfo error', e);
+        return { avatar: '' };
       }
     }
 
-    async function getUploadsPlaylistId(channelId) {
-      const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=contentDetails&id=${channelId}&key=${apiKey}`);
-      const data = await res.json();
-      return data.items?.[0]?.contentDetails.relatedPlaylists.uploads;
-    }
-
-    async function getVideosFromPlaylist(playlistId, channelId) {
-      const res = await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=20&playlistId=${playlistId}&key=${apiKey}`);
-      const data = await res.json();
-      return (data.items || []).map(item => ({
-        title: item.snippet.title,
-        thumbnail: item.snippet.thumbnails.high.url,
-        publishedAt: item.snippet.publishedAt,
-        channelId: channelId,
-        videoId: item.snippet.resourceId.videoId
-      }));
+    // Fetch videos via search endpoint
+    async function getVideosFromChannel(channelId) {
+      try {
+        const res = await fetch(
+          `https://www.googleapis.com/youtube/v3/search?` +
+          `key=${apiKey}&channelId=${channelId}&part=snippet,id&order=date&maxResults=20&type=video`
+        );
+        const data = await res.json();
+        return (data.items || []).map(item => ({
+          title: item.snippet.title,
+          thumbnail: item.snippet.thumbnails.high.url,
+          channelId: channelId,
+          videoId: item.id.videoId,
+          publishedAt: item.snippet.publishedAt
+        }));
+      } catch (e) {
+        console.error('getVideosFromChannel error', e);
+        return [];
+      }
     }
 
     async function load() {
       const grid = document.getElementById('grid');
       try {
-        // Fetch channel avatars
         const channelInfo = {};
         await Promise.all(channelIds.map(async id => {
           channelInfo[id] = await fetchChannelInfo(id);
         }));
 
-        // Fetch videos
         let videos = [];
         for (const id of channelIds) {
-          const pid = await getUploadsPlaylistId(id);
-          if (!pid) continue;
-          const vids = await getVideosFromPlaylist(pid, id);
+          const vids = await getVideosFromChannel(id);
           videos = videos.concat(vids);
         }
         videos.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
 
-        // Render
         grid.innerHTML = '';
+        if (videos.length === 0) {
+          grid.textContent = 'No videos found.';
+          return;
+        }
+
         videos.forEach(v => {
-          const div = document.createElement('div'); div.className = 'video';
+          const div = document.createElement('div');
+          div.className = 'video';
           div.innerHTML = `
             <a href="https://www.youtube.com/watch?v=${v.videoId}" target="_blank">
               <img class="thumb" src="${v.thumbnail}" alt="">
@@ -88,8 +95,6 @@
             </a>`;
           grid.appendChild(div);
         });
-
-        if (videos.length === 0) grid.textContent = 'No videos found.';
       } catch (e) {
         console.error('load error', e);
         document.getElementById('error').textContent = 'Error loading videos.';
