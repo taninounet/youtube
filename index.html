@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YouTube Video Feed</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 1rem;
+      background: #f4f4f4;
+    }
+    h1 {
+      text-align: center;
+    }
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+    .video {
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      transition: transform 0.2s;
+    }
+    .video:hover {
+      transform: scale(1.03);
+    }
+    .video img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    .video .info {
+      padding: 0.5rem;
+    }
+    .video .info h3 {
+      font-size: 1rem;
+      margin: 0;
+    }
+    .video .info p {
+      font-size: 0.8rem;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+  <h1>Chronological YouTube Feed</h1>
+  <div id="grid"></div>
+
+  <script>
+    const apiKey = 'YOUR_API_KEY'; // Replace with your YouTube Data API v3 key
+    const channelIds = [
+      'UC_x5XG1OV2P6uZZ5FSM9Ttw', // Example: Google Developers
+      'UCVHFbqXqoYvEWM1Ddxl0QDg'  // Example: Android Developers
+    ];
+
+    async function getUploadsPlaylistId(channelId) {
+      const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=contentDetails&id=${channelId}&key=${apiKey}`);
+      const data = await res.json();
+      return data.items[0].contentDetails.relatedPlaylists.uploads;
+    }
+
+    async function getVideosFromPlaylist(playlistId) {
+      const res = await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=10&playlistId=${playlistId}&key=${apiKey}`);
+      const data = await res.json();
+      return data.items.map(item => ({
+        title: item.snippet.title,
+        thumbnail: item.snippet.thumbnails.medium.url,
+        publishedAt: item.snippet.publishedAt,
+        videoId: item.snippet.resourceId.videoId,
+        channelTitle: item.snippet.channelTitle
+      }));
+    }
+
+    async function loadVideos() {
+      let allVideos = [];
+      for (const id of channelIds) {
+        const playlistId = await getUploadsPlaylistId(id);
+        const videos = await getVideosFromPlaylist(playlistId);
+        allVideos = allVideos.concat(videos);
+      }
+      allVideos.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+      displayVideos(allVideos);
+    }
+
+    function displayVideos(videos) {
+      const grid = document.getElementById('grid');
+      grid.innerHTML = '';
+      for (const vid of videos) {
+        const el = document.createElement('div');
+        el.className = 'video';
+        el.innerHTML = `
+          <a href="https://www.youtube.com/watch?v=${vid.videoId}" target="_blank">
+            <img src="${vid.thumbnail}" alt="${vid.title}" />
+            <div class="info">
+              <h3>${vid.title}</h3>
+              <p>${new Date(vid.publishedAt).toLocaleString()}<br>${vid.channelTitle}</p>
+            </div>
+          </a>
+        `;
+        grid.appendChild(el);
+      }
+    }
+
+    loadVideos();
+  </script>
+</body>
+</html>
