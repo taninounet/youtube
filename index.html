@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Chronological YouTube Feed</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MyTV</title>
   <style>
     body {
       font-family: sans-serif;
@@ -11,19 +11,10 @@
       padding: 1rem;
       background: #f4f4f4;
     }
-    h1 {
-      text-align: center;
-    }
-    #error {
-      color: red;
-      text-align: center;
-      margin-top: 1rem;
-    }
     #grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px,1fr));
+      grid-template-columns: repeat(7, 1fr);
       gap: 1rem;
-      margin-top: 2rem;
     }
     .video {
       background: #fff;
@@ -32,81 +23,101 @@
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
       transition: transform 0.2s;
     }
-    .video:hover { transform: scale(1.03) }
+    .video:hover {
+      transform: scale(1.03);
+    }
+    .video a {
+      text-decoration: none;
+      color: inherit;
+      display: block;
+    }
     .video img {
       width: 100%;
       display: block;
     }
     .info {
+      display: flex;
+      align-items: center;
       padding: 0.5rem;
     }
     .info h3 {
       font-size: 1rem;
       margin: 0;
+      line-height: 1.2;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      overflow: hidden;
+      flex: 1;
     }
-    .info p {
-      font-size: 0.8rem;
-      color: #555;
-      margin: 0.25rem 0 0;
+    .avatar {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      margin-left: 0.5rem;
+      flex-shrink: 0;
+    }
+    #error {
+      color: red;
+      text-align: center;
+      margin-top: 1rem;
     }
   </style>
 </head>
 <body>
-  <h1>Chronological YouTube Feed</h1>
   <div id="grid">Loading videos…</div>
   <div id="error"></div>
 
   <script>
     const apiKey = 'AIzaSyAoh7__mqdxlqOXWz_WC4_fDYGR5ftvYfU';
     const channelIds = [
-      'UC_x5XG1OV2P6uZZ5FSM9Ttw', // Example: Google Developers
-      'UCVHFbqXqoYvEWM1Ddxl0QDg'  // Example: Android Developers
+      'UC_x5XG1OV2P6uZZ5FSM9Ttw', // Google Developers
+      'UCVHFbqXqoYvEWM1Ddxl0QDg'  // Android Developers
     ];
 
-    async function getUploadsPlaylistId(channelId) {
-      console.log('Fetching uploads playlist for', channelId);
+    async function getUploadsPlaylistId(ch) {
       const res = await fetch(
-        `https://www.googleapis.com/youtube/v3/channels?` +
-        `part=contentDetails&id=${channelId}&key=${apiKey}`
+        `https://www.googleapis.com/youtube/v3/channels?part=contentDetails&id=${ch}&key=${apiKey}`
       );
-      const data = await res.json();
-      if (!data.items || !data.items[0]) {
-        throw new Error(`No channel data for ${channelId}`);
-      }
-      return data.items[0].contentDetails.relatedPlaylists.uploads;
+      const { items, error } = await res.json();
+      if (error) throw new Error(error.message);
+      return items[0].contentDetails.relatedPlaylists.uploads;
     }
 
-    async function getVideosFromPlaylist(playlistId) {
-      console.log('Fetching videos from playlist', playlistId);
+    async function getVideosFromPlaylist(pl) {
       const res = await fetch(
-        `https://www.googleapis.com/youtube/v3/playlistItems?` +
-        `part=snippet&maxResults=10&playlistId=${playlistId}&key=${apiKey}`
+        `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=20&playlistId=${pl}&key=${apiKey}`
       );
-      const data = await res.json();
-      if (!data.items) {
-        throw new Error(`No videos found in playlist ${playlistId}`);
-      }
-      return data.items.map(item => ({
+      const { items, error } = await res.json();
+      if (error) throw new Error(error.message);
+      return items.map(item => ({
         title: item.snippet.title,
         thumbnail: item.snippet.thumbnails.medium.url,
-        publishedAt: item.snippet.publishedAt,
         videoId: item.snippet.resourceId.videoId,
-        channelTitle: item.snippet.channelTitle
+        channelId: item.snippet.channelId
       }));
     }
 
-    function displayVideos(videos) {
+    async function fetchAvatar(ch) {
+      const res = await fetch(
+        `https://www.googleapis.com/youtube/v3/channels?part=snippet&id=${ch}&key=${apiKey}`
+      );
+      const { items } = await res.json();
+      return items[0]?.snippet?.thumbnails?.default?.url || '';
+    }
+
+    function displayVideos(videos, avatars) {
       const grid = document.getElementById('grid');
       grid.innerHTML = '';
-      videos.forEach(vid => {
+      videos.forEach(v => {
         const div = document.createElement('div');
         div.className = 'video';
         div.innerHTML = `
-          <a href="https://www.youtube.com/watch?v=${vid.videoId}" target="_blank">
-            <img src="${vid.thumbnail}" alt="${vid.title}"/>
+          <a href="https://www.youtube.com/watch?v=${v.videoId}" target="_blank">
+            <img src="${v.thumbnail}" alt="${v.title}" />
             <div class="info">
-              <h3>${vid.title}</h3>
-              <p>${new Date(vid.publishedAt).toLocaleString()}<br>${vid.channelTitle}</p>
+              <h3>${v.title}</h3>
+              <img class="avatar" src="${avatars[v.channelId]}" alt="Avatar" />
             </div>
           </a>
         `;
@@ -116,23 +127,20 @@
 
     async function loadVideos() {
       try {
-        let all = [];
-        for (const ch of channelIds) {
-          const pid = await getUploadsPlaylistId(ch);
-          const vids = await getVideosFromPlaylist(pid);
-          all = all.concat(vids);
+        const all = [];
+        const avatars = {};
+        for (let ch of channelIds) {
+          const pl = await getUploadsPlaylistId(ch);
+          const vids = await getVideosFromPlaylist(pl);
+          avatars[ch] = await fetchAvatar(ch);
+          all.push(...vids);
         }
-        all.sort((a,b) => new Date(b.publishedAt) - new Date(a.publishedAt));
-        if (all.length === 0) {
-          document.getElementById('grid').textContent = 'No videos to display.';
-        } else {
-          displayVideos(all);
-        }
+        all.sort((a,b) => 0); // Already chronological by playlist order
+        displayVideos(all, avatars);
       } catch (e) {
         console.error(e);
         document.getElementById('grid').textContent = '';
-        document.getElementById('error').textContent =
-          '⚠️ Error loading videos. Check console for details.';
+        document.getElementById('error').textContent = `⚠️ ${e.message}`;
       }
     }
 
