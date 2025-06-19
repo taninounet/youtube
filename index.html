@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>MyTV</title>
   <style>
     body {
@@ -31,10 +31,12 @@
       color: inherit;
       display: block;
     }
-    .video img {
+    /* Thumbnail only */
+    .thumb {
       width: 100%;
       display: block;
     }
+    /* Remove generic img rule to avoid affecting avatar */
     .info {
       display: flex;
       align-items: center;
@@ -86,7 +88,7 @@
 
     async function getVideosFromPlaylist(pl) {
       const res = await fetch(
-        `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=20&playlistId=${pl}&key=${apiKey}`
+        `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=${pl}&key=${apiKey}`
       );
       const { items, error } = await res.json();
       if (error) throw new Error(error.message);
@@ -94,7 +96,8 @@
         title: item.snippet.title,
         thumbnail: item.snippet.thumbnails.medium.url,
         videoId: item.snippet.resourceId.videoId,
-        channelId: item.snippet.channelId
+        channelId: item.snippet.channelId,
+        publishedAt: item.snippet.publishedAt
       }));
     }
 
@@ -114,7 +117,7 @@
         div.className = 'video';
         div.innerHTML = `
           <a href="https://www.youtube.com/watch?v=${v.videoId}" target="_blank">
-            <img src="${v.thumbnail}" alt="${v.title}" />
+            <img class="thumb" src="${v.thumbnail}" alt="${v.title}" />
             <div class="info">
               <h3>${v.title}</h3>
               <img class="avatar" src="${avatars[v.channelId]}" alt="Avatar" />
@@ -127,7 +130,7 @@
 
     async function loadVideos() {
       try {
-        const all = [];
+        let all = [];
         const avatars = {};
         for (let ch of channelIds) {
           const pl = await getUploadsPlaylistId(ch);
@@ -135,7 +138,10 @@
           avatars[ch] = await fetchAvatar(ch);
           all.push(...vids);
         }
-        all.sort((a,b) => 0); // Already chronological by playlist order
+        // sort by published date, newest first
+        all.sort((a,b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+        // limit to first 14 videos
+        all = all.slice(0, 14);
         displayVideos(all, avatars);
       } catch (e) {
         console.error(e);
