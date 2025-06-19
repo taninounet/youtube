@@ -1,3 +1,4 @@
+# .github/workflows/deploy.yml
 name: Deploy to GitHub Pages
 
 on:
@@ -6,9 +7,9 @@ on:
       - main
 
 permissions:
-  contents: read       # allow checkout to read your code
-  pages: write         # allow Pages to publish
-  id-token: write      # required by the pages action
+  contents: read
+  pages: write
+  id-token: write
 
 jobs:
   deploy:
@@ -25,9 +26,10 @@ jobs:
         uses: actions/configure-pages@v4
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v2
+        # ← bump from v2 → v3
+        uses: actions/upload-pages-artifact@v3
         with:
-          path: .   # points at your index.html and assets in the repo root
+          path: .   # point at your index.html & assets
 
       - name: Deploy to GitHub Pages
         id: deployment
