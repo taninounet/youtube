@@ -25,14 +25,49 @@
   <div id="error"></div>
 
   <script>
-    const apiKey = 'AIzaSyAoh7__mqdxlqOXWz_WC4_fDYGR5ftvYfU';
+    const apiKey = 'AIzaSyDKsvHWcSIez1iLbHwxemrn_sHaBvm1hno';
     const channelIds = [
-      'UC9pVBqtx2-XrSfKn3BwHrXA', /* ... your channels ... */ 'UCM-5Uhbx6fBc5R2iGPhureQ'
+      'UC9pVBqtx2-XrSfKn3BwHrXA',
+      'UCEg25rdRZXg32iwai6N6l0w',
+      'UC0k238zFx-Z8xFH0sxCrPJg',
+      'UCgxg48_pay4R67s-7WOgWFA',
+      'UCM07efrlZH90GNT0dw6Bjwg',
+      'UCiOYwNIHlU84JqPOP_JTQog',
+      'UCimiUgDLbi6P17BdaCZpVbg',
+      'UCEIwxahdLz7bap-VDs9h35A',
+      'UC52kszkc08-acFOuogFl5jw',
+      'UCYO_jab_esuFRV4b17AJtAw',
+      'UC-lHJZR3Gqxm24_Vd_AJ5Yw',
+      'UCjbUKFFbH0JYU94ONGDeM-A',
+      'UCwgzx-E7BXya5thqTVFPCrg',
+      'UCLgEVx4mzk3T3mzgbKG54Eg',
+      'UCW3uAglIsjfItk8QPnXrfSQ',
+      'UCVrQlLNQrEYowd8FoMsz2pQ',
+      'UCq7CQYR52FInW_O-2PINXrA',
+      'UCuorb_RJELnRqBGtsdRthbA',
+      'UCDBPUSh5CCa8k2hTx7UlbXg',
+      'UCBtHvVMt0_Ozr8L7l8hS0ow',
+      'UCQAX7iV0OjeIKc_fNucA5Ew',
+      'UCAG1ABZP-c7wuNt0fziHtsA',
+      'UC_EahESpmOsO_5hAmsNSqlw',
+      'UCLLHnS6pKU4GdGEZjysogqQ',
+      'UC1zrPxxLTkfQdbwdn6lJQ7w',
+      'UCM2ra7Od2jliHB9TLPKt76w',
+      'UClK2ZkC3gVjdONAsIDcSFUQ',
+      'UC-HSLEEHVlnqlgTB7UptLeg',
+      'UCdpC3D4fpOxqMRil9cBQxSA',
+      'UCvXxdkt1d8Uu08NAQP2IUTw',
+      'UCQHX6ViZmPsWiYSFAyS0a3Q',
+      'UCRC6cNamj9tYAO6h_RXd5xA',
+      'UCkJdvwRC-oGPhRHW_XPNokg',
+      'UCgRBRE1DUP2w7HTH9j_L4OQ',
+      'UCGld0__71apOn0_1EvSkzWw',
+      'UCM-5Uhbx6fBc5R2iGPhureQ'
     ];
 
     function isRecent(dateStr) {
       const d = new Date(dateStr), now = new Date();
-      return (now - d) <= 2 * 24 * 60 * 60 * 1000; // today or yesterday
+      return (now - d) <= 2 * 24 * 60 * 60 * 1000;
     }
 
     async function fetchJSON(url) {
@@ -51,8 +86,7 @@
       return json;
     }
 
-    // Use playlistItems for efficiency
-    async function getPlaylistVideos(ch, maxResults=63) {
+    async function getPlaylistVideos(ch, maxResults=42) {
       const { items: chData } = await fetchJSON(
         `https://www.googleapis.com/youtube/v3/channels?part=contentDetails,snippet&id=${ch}&key=${apiKey}`
       );
@@ -61,15 +95,14 @@
       const { items } = await fetchJSON(
         `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${pid}&maxResults=${maxResults}&key=${apiKey}`
       );
-      const videos = items.map(i => ({
+      return { videos: items.map(i => ({
         title: i.snippet.title,
         thumbnail: i.snippet.thumbnails.medium.url,
         videoId: i.snippet.resourceId.videoId,
         channelId: ch,
         publishedAt: i.snippet.publishedAt,
         isRecent: isRecent(i.snippet.publishedAt)
-      }));
-      return { videos, avatar };
+      })), avatar };
     }
 
     function displayVideos(videos, avatars) {
@@ -94,17 +127,14 @@
       try {
         const all = [], avatars = {}, lastVideos = [];
         for (const ch of channelIds) {
-          const { videos, avatar } = await getPlaylistVideos(ch, 42);
+          const { videos, avatar } = await getPlaylistVideos(ch);
           avatars[ch] = avatar;
           all.push(...videos);
-          // last non-short is the first playlist item
           const last = { ...videos[0], isLast: true };
           lastVideos.push(last);
         }
         all.sort((a,b) => new Date(b.publishedAt) - new Date(a.publishedAt));
-        const recentVideos = all.slice(0, 42);
-        displayVideos(recentVideos, avatars);
-        // separator
+        displayVideos(all.slice(0,42), avatars);
         const sep = document.createElement('div'); sep.className='separator';
         document.getElementById('grid').appendChild(sep);
         displayVideos(lastVideos, avatars);
