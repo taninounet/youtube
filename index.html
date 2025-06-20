@@ -24,8 +24,11 @@
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
       transition: transform 0.2s;
     }
-    .video.today {
-      background-color: #fff8dc; /* light gold hue for recent videos (today or yesterday) */
+    .video.recent {
+      background-color: #fff8dc; /* light gold for today/yesterday */
+    }
+    .video.last {
+      background-color: #e0f7ff; /* light blue for channel's last video */
     }
     .video:hover {
       transform: scale(1.03);
@@ -75,42 +78,7 @@
   <script>
     const apiKey = 'AIzaSyAoh7__mqdxlqOXWz_WC4_fDYGR5ftvYfU';
     const channelIds = [
-      'UC9pVBqtx2-XrSfKn3BwHrXA',
-      'UCEg25rdRZXg32iwai6N6l0w',
-      'UC0k238zFx-Z8xFH0sxCrPJg',
-      'UCgxg48_pay4R67s-7WOgWFA',
-      'UCM07efrlZH90GNT0dw6Bjwg',
-      'UCiOYwNIHlU84JqPOP_JTQog',
-      'UCimiUgDLbi6P17BdaCZpVbg',
-      'UCEIwxahdLz7bap-VDs9h35A',
-      'UC52kszkc08-acFOuogFl5jw',
-      'UCYO_jab_esuFRV4b17AJtAw',
-      'UC-lHJZR3Gqxm24_Vd_AJ5Yw',
-      'UCjbUKFFbH0JYU94ONGDeM-A',
-      'UCwgzx-E7BXya5thqTVFPCrg',
-      'UCLgEVx4mzk3T3mzgbKG54Eg',
-      'UCW3uAglIsjfItk8QPnXrfSQ',
-      'UCVrQlLNQrEYowd8FoMsz2pQ',
-      'UCq7CQYR52FInW_O-2PINXrA',
-      'UCuorb_RJELnRqBGtsdRthbA',
-      'UCDBPUSh5CCa8k2hTx7UlbXg',
-      'UCBtHvVMt0_Ozr8L7l8hS0ow',
-      'UCQAX7iV0OjeIKc_fNucA5Ew',
-      'UCAG1ABZP-c7wuNt0fziHtsA',
-      'UC_EahESpmOsO_5hAmsNSqlw',
-      'UCLLHnS6pKU4GdGEZjysogqQ',
-      'UC1zrPxxLTkfQdbwdn6lJQ7w',
-      'UCM2ra7Od2jliHB9TLPKt76w',
-      'UClK2ZkC3gVjdONAsIDcSFUQ',
-      'UC-HSLEEHVlnqlgTB7UptLeg',
-      'UCdpC3D4fpOxqMRil9cBQxSA',
-      'UCvXxdkt1d8Uu08NAQP2IUTw',
-      'UCQHX6ViZmPsWiYSFAyS0a3Q',
-      'UCRC6cNamj9tYAO6h_RXd5xA',
-      'UCkJdvwRC-oGPhRHW_XPNokg',
-      'UCgRBRE1DUP2w7HTH9j_L4OQ',
-      'UCGld0__71apOn0_1EvSkzWw',
-      'UCM-5Uhbx6fBc5R2iGPhureQ'
+      /* ... your list of channel IDs ... */
     ];
 
     function isRecent(dateStr) {
@@ -120,45 +88,56 @@
       return diffDays <= 1;
     }
 
-    async function getUploadsPlaylistId(ch) {
-      const res = await fetch(
-        `https://www.googleapis.com/youtube/v3/channels?part=contentDetails&id=${ch}&key=${apiKey}`
-      );
-      const { items, error } = await res.json();
-      if (error) throw new Error(error.message);
-      return items[0].contentDetails.relatedPlaylists.uploads;
+    async function fetchJSON(url) {
+      const res = await fetch(url);
+      const json = await res.json();
+      if (json.error) throw new Error(json.error.message);
+      return json;
     }
 
-    async function getVideosFromPlaylist(pl) {
-      const res = await fetch(
-        `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=${pl}&key=${apiKey}`
+    async function getUploadsPlaylistId(ch) {
+      const data = await fetchJSON(
+        `https://www.googleapis.com/youtube/v3/channels?part=contentDetails&id=${ch}&key=${apiKey}`
       );
-      const { items, error } = await res.json();
-      if (error) throw new Error(error.message);
-      return items.map(item => ({
-        title: item.snippet.title,
-        thumbnail: item.snippet.thumbnails.medium.url,
-        videoId: item.snippet.resourceId.videoId,
-        channelId: item.snippet.channelId,
-        publishedAt: item.snippet.publishedAt
+      return data.items[0].contentDetails.relatedPlaylists.uploads;
+    }
+
+    async function getVideosFromChannel(ch) {
+      const data = await fetchJSON(
+        `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${ch}&order=date&maxResults=50&type=video&videoDuration=medium&key=${apiKey}`
+      );
+      return data.items.map(i => ({
+        title: i.snippet.title,
+        thumbnail: i.snippet.thumbnails.medium.url,
+        videoId: i.id.videoId,
+        channelId: ch,
+        publishedAt: i.snippet.publishedAt
       }));
     }
 
-    async function fetchAvatar(ch) {
-      const res = await fetch(
-        `https://www.googleapis.com/youtube/v3/channels?part=snippet&id=${ch}&key=${apiKey}`
+    async function fetchLastVideo(ch) {
+      const data = await fetchJSON(
+        `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${ch}&order=date&maxResults=1&type=video&key=${apiKey}`
       );
-      const { items } = await res.json();
-      return items[0]?.snippet?.thumbnails?.default?.url || '';
+      const i = data.items[0];
+      return {
+        title: i.snippet.title,
+        thumbnail: i.snippet.thumbnails.medium.url,
+        videoId: i.id.videoId,
+        channelId: ch,
+        publishedAt: i.snippet.publishedAt
+      };
     }
 
     function displayVideos(videos, avatars) {
       const grid = document.getElementById('grid');
       grid.innerHTML = '';
       videos.forEach(v => {
-        const cls = isRecent(v.publishedAt) ? 'video today' : 'video';
+        const cls = ['video'];
+        if (v.isRecent) cls.push('recent');
+        if (v.isLast) cls.push('last');
         const div = document.createElement('div');
-        div.className = cls;
+        div.className = cls.join(' ');
         div.innerHTML = `
           <a href="https://www.youtube.com/watch?v=${v.videoId}" target="_blank">
             <img class="thumb" src="${v.thumbnail}" alt="${v.title}" />
@@ -174,18 +153,25 @@
 
     async function loadVideos() {
       try {
-        let all = [];
+        const all = [];
         const avatars = {};
+        const lastVideos = [];
         for (let ch of channelIds) {
-          const pl = await getUploadsPlaylistId(ch);
-          const vids = await getVideosFromPlaylist(pl);
-          avatars[ch] = await fetchAvatar(ch);
+          const vids = await getVideosFromChannel(ch);
+          avatars[ch] = (await fetchJSON(
+            `https://www.googleapis.com/youtube/v3/channels?part=snippet&id=${ch}&key=${apiKey}`
+          )).items[0].snippet.thumbnails.default.url;
+          vids.forEach(v => v.isRecent = isRecent(v.publishedAt));
           all.push(...vids);
+          const last = await fetchLastVideo(ch);
+          last.isLast = true;
+          lastVideos.push(last);
         }
-        all.sort((a,b) => new Date(b.publishedAt) - new Date(a.publishedAt));
-        all = all.slice(0, 42);
-        displayVideos(all, avatars);
-      } catch (e) {
+        all.sort((a,b)=> new Date(b.publishedAt)-new Date(a.publishedAt));
+        let display = all.slice(0, 63);
+        display = display.concat(lastVideos);
+        displayVideos(display, avatars);
+      } catch(e) {
         console.error(e);
         document.getElementById('grid').textContent = '';
         document.getElementById('error').textContent = `⚠️ ${e.message}`;
